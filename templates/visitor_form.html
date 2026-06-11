@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}{% if mode == 'new' %}Νέος επισκέπτης{% else %}{{ visitor.full_name }}{% endif %} - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">{% if mode == 'new' %}Νέα εγγραφή επισκέπτη{% else %}{{ visitor.full_name }}{% endif %}</h1>
+        <p class="page-kicker">{% if mode == 'new' %}Καταχώριση πρόσβασης{% else %}{{ visitor.identity_number or '-' }} · {{ visitor.status }}{% endif %}</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        {% if mode != 'new' %}
+        <a class="btn btn-outline-secondary" href="{{ url_for('visitor_label', visitor_id=visitor.id) }}" target="_blank">Ετικέτα QR</a>
+        {% endif %}
+        <a class="btn btn-outline-primary" href="{{ url_for('visitors') }}">Λίστα</a>
+    </div>
+</div>
+
+<form method="post" enctype="multipart/form-data">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <div class="row g-4">
+        <div class="col-xl-8">
+            <div class="card mb-4">
+                <div class="card-header">Στοιχεία προσώπου</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Ονοματεπώνυμο</label>
+                            <input class="form-control" name="full_name" value="{{ visitor.full_name or '' }}" required {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Ταυτότητα</label>
+                            <input class="form-control" name="identity_number" value="{{ visitor.identity_number or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Τηλέφωνο</label>
+                            <input class="form-control" name="phone" value="{{ visitor.phone or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Φορέας</label>
+                            <input class="form-control" name="organization" value="{{ visitor.organization or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Ιδιότητα</label>
+                            <input class="form-control" name="role_title" value="{{ visitor.role_title or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card mb-4">
+                <div class="card-header">Πρόσβαση</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Προορισμός</label>
+                            <input class="form-control" name="destination" value="{{ visitor.destination or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Λόγος</label>
+                            <input class="form-control" name="visit_reason" value="{{ visitor.visit_reason or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Πεδίο πρόσβασης</label>
+                            <input class="form-control" name="access_scope" value="{{ visitor.access_scope or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Από</label>
+                            <input class="form-control" type="datetime-local" name="valid_from" value="{{ visitor.valid_from.strftime('%Y-%m-%dT%H:%M') if visitor.valid_from else '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label fw-semibold">Έως</label>
+                            <input class="form-control" type="datetime-local" name="valid_until" value="{{ visitor.valid_until.strftime('%Y-%m-%dT%H:%M') if visitor.valid_until else '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Status</label>
+                            <select class="form-select" name="status" {% if not can_manage_visitors() %}disabled{% endif %}>
+                                <option value="active" {% if visitor.status == 'active' or not visitor.status %}selected{% endif %}>Ενεργό</option>
+                                <option value="closed" {% if visitor.status == 'closed' %}selected{% endif %}>Κλειστό</option>
+                                <option value="revoked" {% if visitor.status == 'revoked' %}selected{% endif %}>Ανακλήθηκε</option>
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Σημειώσεις</label>
+                            <textarea class="form-control" name="notes" rows="4" {% if not can_manage_visitors() %}disabled{% endif %}>{{ visitor.notes or '' }}</textarea>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">Έγγραφο αδειοδότησης</div>
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Αρ. εγγράφου</label>
+                            <input class="form-control" name="authorization_doc_no" value="{{ visitor.authorization_doc_no or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Εκδότης</label>
+                            <input class="form-control" name="authorization_issuer" value="{{ visitor.authorization_issuer or '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label fw-semibold">Ημερομηνία</label>
+                            <input class="form-control" type="date" name="authorization_date" value="{{ visitor.authorization_date.isoformat() if visitor.authorization_date else '' }}" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label fw-semibold">Αρχείο</label>
+                            <input class="form-control" type="file" name="authorization_file" {% if not can_manage_visitors() %}disabled{% endif %}>
+                        </div>
+                        <div class="col-md-4 d-flex align-items-end">
+                            {% if visitor.authorization_filename %}
+                            <a class="btn btn-outline-secondary w-100" href="{{ url_for('visitor_authorization', visitor_id=visitor.id) }}">Λήψη αρχείου</a>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {% if can_manage_visitors() %}
+            <div class="mt-4">
+                <button class="btn btn-primary" type="submit">Αποθήκευση</button>
+            </div>
+            {% endif %}
+        </div>
+        <div class="col-xl-4">
+            {% if mode != 'new' %}
+            <div class="card">
+                <div class="card-header">QR</div>
+                <div class="card-body text-center">
+                    <img class="qr-large" src="{{ url_for('visitor_qr', visitor_id=visitor.id) }}" alt="QR">
+                    <div class="mt-3 compact-text">Τελευταίο scan: {{ visitor.last_scanned_at|datetime_el }}{% if visitor.last_scanned_by %} · {{ visitor.last_scanned_by }}{% endif %}</div>
+                </div>
+            </div>
+            <div class="card mt-4">
+                <div class="card-header">Μεταβολές</div>
+                <div class="card-body">
+                    <dl class="row mb-0">
+                        <dt class="col-sm-5">Δημιουργία</dt>
+                        <dd class="col-sm-7">{{ visitor.created_at|datetime_el }}</dd>
+                        <dt class="col-sm-5">Χρήστης</dt>
+                        <dd class="col-sm-7">{{ visitor.created_by or '-' }}</dd>
+                        <dt class="col-sm-5">Ενημέρωση</dt>
+                        <dd class="col-sm-7">{{ visitor.updated_at|datetime_el }}</dd>
+                    </dl>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</form>
+{% endblock %}

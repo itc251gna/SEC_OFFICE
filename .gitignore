@@ -1,0 +1,13 @@
+.env
+runtime/
+static/uploads/
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
+instance/
+*.sqlite3
+*.db
+.mypy_cache/
+.ruff_cache/

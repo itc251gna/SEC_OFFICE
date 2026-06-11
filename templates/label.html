@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="el">
+<head>
+    <meta charset="utf-8">
+    <title>QR label</title>
+    <link href="{{ url_for('static', filename='css/bootstrap.min.css') }}" rel="stylesheet">
+    <link href="{{ url_for('static', filename='css/custom.css') }}" rel="stylesheet">
+</head>
+<body class="label-body">
+<div class="label-sheet">
+    <div class="label-box">
+        <div class="d-flex align-items-center gap-2 mb-2">
+            <img src="{{ url_for('static', filename='251gna_logo.png') }}" class="label-logo" alt="251 ΓΝΑ">
+            <div>
+                <div class="label-heading">251 ΓΝΑ</div>
+                <div class="compact-text">{% if kind == 'patient' %}Νοσηλευόμενος{% else %}Επισκέπτης{% endif %}</div>
+            </div>
+        </div>
+        {% if kind == 'patient' %}
+        <div class="label-name">{{ record.full_name }}</div>
+        <div class="label-meta">ΑΡ.ΠΕΡ. {{ record.pat }} · {{ record.dep or '-' }} · {{ record.room or '-' }}</div>
+        <img class="label-qr" src="{{ url_for('patient_qr', patient_id=record.id) }}" alt="QR">
+        {% else %}
+        <div class="label-name">{{ record.full_name }}</div>
+        <div class="label-meta">{{ record.destination or '-' }} · {{ record.valid_until|datetime_el }}</div>
+        <img class="label-qr" src="{{ url_for('visitor_qr', visitor_id=record.id) }}" alt="QR">
+        {% endif %}
+    </div>
+</div>
+<script>window.addEventListener("load", () => window.print());</script>
+</body>
+</html>

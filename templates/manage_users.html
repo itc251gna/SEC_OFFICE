@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Χρήστες - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Χρήστες και ρόλοι</h1>
+        <p class="page-kicker">Κεντρικό SSO με τοπικό fallback.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-primary" href="{{ central_auth.users_url }}" target="_blank" rel="noopener">Keycloak users</a>
+        <a class="btn btn-outline-secondary" href="{{ central_auth.groups_url }}" target="_blank" rel="noopener">Keycloak groups</a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-xl-5">
+        <div class="card h-100">
+            <div class="card-header">Νέος τοπικός χρήστης</div>
+            <div class="card-body">
+                <form method="post" action="{{ url_for('create_user') }}">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Username</label>
+                            <input class="form-control" name="username" required>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-semibold">Κωδικός</label>
+                            <input class="form-control" type="password" name="password" minlength="8" required>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label fw-semibold">Ρόλος</label>
+                            <select class="form-select" name="role">
+                                {% for code, info in roles.items() %}
+                                <option value="{{ code }}">{{ info.label }}</option>
+                                {% endfor %}
+                            </select>
+                        </div>
+                        <div class="col-12">
+                            <button class="btn btn-primary" type="submit">Δημιουργία</button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="card h-100">
+            <div class="card-header">SSO groups εφαρμογής</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <tbody>
+                            {% for group, description in central_auth.groups %}
+                            <tr>
+                                <td><code>{{ group }}</code></td>
+                                <td>{{ description }}</td>
+                            </tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-header">Τοπικοί fallback χρήστες</div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Username</th>
+                        <th>Ρόλος</th>
+                        <th>Κατάσταση</th>
+                        <th>Νέος κωδικός</th>
+                        <th class="text-end">Ενέργειες</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for user in users %}
+                    <tr>
+                        <form method="post" action="{{ url_for('update_user', user_id=user.id) }}">
+                            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                            <td><strong>{{ user.username }}</strong></td>
+                            <td>
+                                <select class="form-select form-select-sm" name="role">
+                                    {% for code, info in roles.items() %}
+                                    <option value="{{ code }}" {% if user.role == code %}selected{% endif %}>{{ info.label }}</option>
+                                    {% endfor %}
+                                </select>
+                            </td>
+                            <td>
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" name="is_active_local" id="active-{{ user.id }}" {% if user.is_active_local %}checked{% endif %}>
+                                    <label class="form-check-label" for="active-{{ user.id }}">Ενεργός</label>
+                                </div>
+                            </td>
+                            <td><input class="form-control form-control-sm" type="password" name="new_password" minlength="8" placeholder="χωρίς αλλαγή"></td>
+                            <td class="text-end">
+                                <div class="d-flex gap-2 justify-content-end">
+                                    <button class="btn btn-outline-primary btn-sm" type="submit">Αποθήκευση</button>
+                        </form>
+                                    <form method="post" action="{{ url_for('delete_user', user_id=user.id) }}">
+                                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                        <button class="btn btn-outline-danger btn-sm" type="submit">Διαγραφή</button>
+                                    </form>
+                                </div>
+                            </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="5" class="empty-state">Δεν υπάρχουν χρήστες.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

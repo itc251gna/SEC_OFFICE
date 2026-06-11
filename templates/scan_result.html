@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% block title %}Αποτέλεσμα scan - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Αποτέλεσμα QR</h1>
+        <p class="page-kicker">{{ record.last_scanned_at|datetime_el }} · {{ record.last_scanned_by }}</p>
+    </div>
+    <a class="btn btn-primary" href="{{ url_for('scan') }}">Νέο scan</a>
+</div>
+
+{% if kind == 'patient' %}
+<div class="card scan-result-ok">
+    <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+            <div>
+                <div class="result-label">Νοσηλευόμενος</div>
+                <h2 class="result-title">{{ record.full_name }}</h2>
+                <div class="result-meta">ΑΡ.ΠΕΡ. {{ record.pat }} · {{ record.dep or '-' }} · δωμ. {{ record.room or '-' }}</div>
+            </div>
+            <span class="badge badge-completed result-badge">ΕΝΕΡΓΟ</span>
+        </div>
+        <div class="row g-3 mt-3">
+            <div class="col-md-6">
+                <div class="field-label">Συνοδός 1</div>
+                <div class="field-value">{{ record.escort_one or '-' }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="field-label">Συνοδός 2</div>
+                <div class="field-value">{{ record.escort_two or '-' }}</div>
+            </div>
+            <div class="col-12">
+                <div class="field-label">Σημειώσεις</div>
+                <div class="field-value">{{ record.security_notes or '-' }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% else %}
+<div class="card {% if record.is_currently_valid %}scan-result-ok{% else %}scan-result-warn{% endif %}">
+    <div class="card-body">
+        <div class="d-flex flex-column flex-lg-row justify-content-between gap-3">
+            <div>
+                <div class="result-label">Επισκέπτης</div>
+                <h2 class="result-title">{{ record.full_name }}</h2>
+                <div class="result-meta">{{ record.identity_number or '-' }} · {{ record.organization or '-' }}</div>
+            </div>
+            {% if record.is_currently_valid %}
+            <span class="badge badge-completed result-badge">ΕΝΕΡΓΟ</span>
+            {% else %}
+            <span class="badge badge-delayed result-badge">ΕΚΤΟΣ ΙΣΧΥΟΣ</span>
+            {% endif %}
+        </div>
+        <div class="row g-3 mt-3">
+            <div class="col-md-6">
+                <div class="field-label">Προορισμός</div>
+                <div class="field-value">{{ record.destination or '-' }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="field-label">Λόγος</div>
+                <div class="field-value">{{ record.visit_reason or '-' }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="field-label">Ισχύει από</div>
+                <div class="field-value">{{ record.valid_from|datetime_el }}</div>
+            </div>
+            <div class="col-md-6">
+                <div class="field-label">Ισχύει έως</div>
+                <div class="field-value">{{ record.valid_until|datetime_el }}</div>
+            </div>
+            <div class="col-12">
+                <div class="field-label">Έγγραφο</div>
+                <div class="field-value">{{ record.authorization_doc_no or '-' }} · {{ record.authorization_issuer or '-' }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}

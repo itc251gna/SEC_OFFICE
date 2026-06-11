@@ -1,0 +1,29 @@
+services:
+  sec-office-db:
+    image: postgres:15-alpine
+    container_name: sec-office-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sec_office
+      POSTGRES_USER: sec_office
+      POSTGRES_PASSWORD: sec_office_local
+    volumes:
+      - ./runtime/postgres_data:/var/lib/postgresql/data
+
+  sec-office-app:
+    build: .
+    container_name: sec-office-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://sec_office:sec_office_local@sec-office-db:5432/sec_office
+      BACKUP_FOLDER: /app/runtime/backups
+      SESSION_COOKIE_SECURE: "0"
+    ports:
+      - "5055:5000"
+    volumes:
+      - ./runtime/backups:/app/runtime/backups
+      - ./static/uploads:/app/static/uploads
+    depends_on:
+      - sec-office-db

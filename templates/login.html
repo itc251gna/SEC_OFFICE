@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Είσοδος - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="login-wrap">
+    <div class="login-panel">
+        <div class="d-flex align-items-center gap-3 mb-4">
+            <img src="{{ url_for('static', filename='251gna_logo.png') }}" class="brand-logo" alt="251 ΓΝΑ">
+            <div>
+                <h1 class="login-title">Γραφείο Ασφαλείας</h1>
+                <div class="page-kicker">251 ΓΝΑ</div>
+            </div>
+        </div>
+        <form method="post">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <div class="mb-3">
+                <label class="form-label fw-semibold">Username</label>
+                <input class="form-control" name="username" autocomplete="username" autofocus required>
+            </div>
+            <div class="mb-4">
+                <label class="form-label fw-semibold">Κωδικός</label>
+                <input class="form-control" name="password" type="password" autocomplete="current-password" required>
+            </div>
+            <button class="btn btn-primary w-100" type="submit">Είσοδος</button>
+        </form>
+    </div>
+</div>
+{% endblock %}

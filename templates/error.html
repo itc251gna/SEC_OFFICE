@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}{{ status_code }} - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="card">
+    <div class="card-body">
+        <h1 class="page-title">{{ status_code }}</h1>
+        <p class="page-kicker mt-2">{{ message }}</p>
+        <a class="btn btn-primary mt-3" href="{{ url_for('index') }}">Πίνακας</a>
+    </div>
+</div>
+{% endblock %}

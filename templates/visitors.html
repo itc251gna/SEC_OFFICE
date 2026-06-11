@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+{% block title %}Επισκέπτες - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Ημερήσια κατάσταση επισκεπτών</h1>
+        <p class="page-kicker">Πρόσωπα μη ασθενείς, πρόσβαση και έγγραφα αδειοδότησης.</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-success" href="{{ url_for('visitors_export') }}">Excel</a>
+        {% if can_manage_visitors() %}
+        <a class="btn btn-primary" href="{{ url_for('visitor_new') }}">Νέα εγγραφή</a>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form class="row g-2 align-items-end" method="get">
+            <div class="col-lg-6">
+                <label class="form-label fw-semibold">Αναζήτηση</label>
+                <input class="form-control" name="q" value="{{ q }}" placeholder="όνομα, ταυτότητα, φορέας, προορισμός">
+            </div>
+            <div class="col-lg-3">
+                <label class="form-label fw-semibold">Status</label>
+                <select class="form-select" name="status">
+                    <option value="">Όλα</option>
+                    <option value="active" {% if status == 'active' %}selected{% endif %}>Ενεργό</option>
+                    <option value="closed" {% if status == 'closed' %}selected{% endif %}>Κλειστό</option>
+                    <option value="revoked" {% if status == 'revoked' %}selected{% endif %}>Ανακλήθηκε</option>
+                </select>
+            </div>
+            <div class="col-lg-3 d-flex gap-2">
+                <button class="btn btn-outline-primary flex-fill" type="submit">Φίλτρο</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('visitors') }}">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive table-wrap">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>Πρόσωπο</th>
+                        <th>Φορέας</th>
+                        <th>Προορισμός</th>
+                        <th>Έγγραφο</th>
+                        <th>Ισχύς</th>
+                        <th>Status</th>
+                        <th>QR</th>
+                        <th class="text-end">Ενέργειες</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for visitor in records %}
+                    <tr>
+                        <td>
+                            <div class="fw-semibold">{{ visitor.full_name }}</div>
+                            <div class="compact-text">{{ visitor.identity_number or '-' }}{% if visitor.phone %} · {{ visitor.phone }}{% endif %}</div>
+                        </td>
+                        <td>{{ visitor.organization or '-' }}</td>
+                        <td>
+                            <div>{{ visitor.destination or '-' }}</div>
+                            <div class="compact-text">{{ visitor.visit_reason or '' }}</div>
+                        </td>
+                        <td>
+                            <div>{{ visitor.authorization_doc_no or '-' }}</div>
+                            <div class="compact-text">{{ visitor.authorization_issuer or '' }}</div>
+                        </td>
+                        <td>
+                            <div>{{ visitor.valid_from|datetime_el }}</div>
+                            <div class="compact-text">{{ visitor.valid_until|datetime_el }}</div>
+                        </td>
+                        <td>
+                            {% if visitor.is_currently_valid %}
+                            <span class="badge badge-completed">Ενεργό</span>
+                            {% elif visitor.status == 'active' %}
+                            <span class="badge badge-delayed">Εκτός ισχύος</span>
+                            {% else %}
+                            <span class="badge badge-cancelled">{{ visitor.status }}</span>
+                            {% endif %}
+                        </td>
+                        <td><img class="qr-mini" src="{{ url_for('visitor_qr', visitor_id=visitor.id) }}" alt="QR"></td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2">
+                                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('visitor_edit', visitor_id=visitor.id) }}">Άνοιγμα</a>
+                                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('visitor_label', visitor_id=visitor.id) }}" target="_blank">Ετικέτα</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="8" class="empty-state">Δεν υπάρχουν εγγραφές επισκεπτών.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

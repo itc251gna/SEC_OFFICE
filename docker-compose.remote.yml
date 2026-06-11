@@ -1,0 +1,48 @@
+services:
+  sec-office-db:
+    image: postgres:15-alpine
+    container_name: sec-office-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: sec_office
+      POSTGRES_USER: sec_office
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - ./runtime/postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U sec_office -d sec_office"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+
+  sec-office-app:
+    build: .
+    container_name: sec-office-app
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://sec_office:${POSTGRES_PASSWORD}@sec-office-db:5432/sec_office
+      BACKUP_FOLDER: /app/runtime/backups
+      SESSION_COOKIE_SECURE: "1"
+      TRUST_SSO_HEADERS: "1"
+      SSO_TRUSTED_PROXY_CIDRS: 127.0.0.1/32,172.16.0.0/12
+      ORACLE_CONFIG_DIR: /app/runtime/oracle/network/admin
+      TNS_ADMIN: /app/runtime/oracle/network/admin
+      ORACLE_CLIENT_LIB_DIR: /opt/oracle/instantclient
+      LD_LIBRARY_PATH: /opt/oracle/instantclient
+    expose:
+      - "5000"
+    volumes:
+      - ./runtime/backups:/app/runtime/backups
+      - ./static/uploads:/app/static/uploads
+      - ./runtime/oracle/network/admin:/app/runtime/oracle/network/admin:ro
+      - ./runtime/oracle/instantclient:/opt/oracle/instantclient:ro
+    depends_on:
+      sec-office-db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://127.0.0.1:5000/health', timeout=5).read()\""]
+      interval: 30s
+      timeout: 10s
+      retries: 5

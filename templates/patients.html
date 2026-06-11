@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}Νοσηλευόμενοι - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-xl-row align-items-xl-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Ημερήσια κατάσταση νοσηλευομένων</h1>
+        <p class="page-kicker">
+            {% if latest_sync %}Τελευταίο sync: {{ latest_sync.started_at|datetime_el }} · {{ latest_sync.status }}{% else %}Χωρίς sync{% endif %}
+        </p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a class="btn btn-outline-success" href="{{ url_for('patients_export') }}">Excel</a>
+        {% if can_sync_patients() %}
+        <form method="post" action="{{ url_for('patients_sync') }}">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+            <button class="btn btn-primary" type="submit">Sync MEDICO</button>
+        </form>
+        {% endif %}
+    </div>
+</div>
+
+<div class="card mb-3">
+    <div class="card-body">
+        <form class="row g-2 align-items-end" method="get">
+            <div class="col-lg-5">
+                <label class="form-label fw-semibold">Αναζήτηση</label>
+                <input class="form-control" name="q" value="{{ q }}" placeholder="ΑΡ.ΠΕΡ., όνομα, δωμάτιο, συνοδός">
+            </div>
+            <div class="col-lg-4">
+                <label class="form-label fw-semibold">Κλινική</label>
+                <select class="form-select" name="dep">
+                    <option value="">Όλες</option>
+                    {% for item in deps %}
+                    <option value="{{ item }}" {% if dep == item %}selected{% endif %}>{{ item }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <div class="col-lg-3 d-flex gap-2">
+                <button class="btn btn-outline-primary flex-fill" type="submit">Φίλτρο</button>
+                <a class="btn btn-outline-secondary" href="{{ url_for('patients') }}">Reset</a>
+            </div>
+        </form>
+    </div>
+</div>
+
+<div class="card">
+    <div class="card-body p-0">
+        <div class="table-responsive table-wrap">
+            <table class="table table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th>ΑΡ.ΠΕΡ.</th>
+                        <th>Ασθενής</th>
+                        <th>Βαθμός</th>
+                        <th>Μονάδα</th>
+                        <th>Κλινική</th>
+                        <th>Δωμάτιο</th>
+                        <th>Ημ. εισ.</th>
+                        <th>Συνοδός 1</th>
+                        <th>Συνοδός 2</th>
+                        <th>QR</th>
+                        <th class="text-end">Ενέργειες</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for patient in records %}
+                    <tr>
+                        <td><code>{{ patient.pat }}</code></td>
+                        <td>
+                            <div class="fw-semibold">{{ patient.full_name }}</div>
+                            <div class="compact-text">{{ patient.pcd or '-' }} · {{ patient.cfe_type01 or '-' }}</div>
+                        </td>
+                        <td>{{ patient.vip or '-' }}</td>
+                        <td>{{ patient.unit_name or '-' }}</td>
+                        <td>{{ patient.dep or '-' }}</td>
+                        <td>{{ patient.room or '-' }}</td>
+                        <td>{{ patient.hm_eis|date_el }}</td>
+                        <td>{{ patient.escort_one or '-' }}</td>
+                        <td>{{ patient.escort_two or '-' }}</td>
+                        <td>
+                            <img class="qr-mini" src="{{ url_for('patient_qr', patient_id=patient.id) }}" alt="QR">
+                        </td>
+                        <td class="text-end">
+                            <div class="d-flex justify-content-end gap-2">
+                                <a class="btn btn-outline-primary btn-sm" href="{{ url_for('patient_detail', patient_id=patient.id) }}">Άνοιγμα</a>
+                                <a class="btn btn-outline-secondary btn-sm" href="{{ url_for('patient_label', patient_id=patient.id) }}" target="_blank">Ετικέτα</a>
+                            </div>
+                        </td>
+                    </tr>
+                    {% else %}
+                    <tr><td colspan="11" class="empty-state">Δεν υπάρχουν εγγραφές νοσηλευομένων.</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

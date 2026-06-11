@@ -1,0 +1,104 @@
+{% extends "base.html" %}
+{% block title %}Πίνακας - {{ app_name }}{% endblock %}
+{% block content %}
+<div class="d-flex flex-column flex-lg-row align-items-lg-end justify-content-between gap-3 mb-4">
+    <div>
+        <h1 class="page-title">Πίνακας λειτουργίας</h1>
+        <p class="page-kicker">{{ role_label(current_user.role) }} · {{ current_user.username }}</p>
+    </div>
+    {% if can_sync_patients() %}
+    <form method="post" action="{{ url_for('patients_sync') }}">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <button class="btn btn-outline-primary" type="submit">Sync MEDICO</button>
+    </form>
+    {% endif %}
+</div>
+
+<div class="row g-3 mb-4">
+    <div class="col-md-4">
+        <div class="card metric h-100">
+            <div class="card-body">
+                <div class="metric-label">Νοσηλευόμενοι</div>
+                <div class="metric-value">{{ patient_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card metric metric-teal h-100">
+            <div class="card-body">
+                <div class="metric-label">Ενεργοί επισκέπτες</div>
+                <div class="metric-value">{{ visitor_count }}</div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-4">
+        <div class="card metric metric-green h-100">
+            <div class="card-body">
+                <div class="metric-label">Έγκυρες προσβάσεις</div>
+                <div class="metric-value">{{ valid_visitor_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row g-4">
+    <div class="col-xl-5">
+        <div class="card h-100">
+            <div class="card-header">MEDICO sync</div>
+            <div class="card-body">
+                {% if latest_sync %}
+                <dl class="row mb-0">
+                    <dt class="col-sm-4">Status</dt>
+                    <dd class="col-sm-8"><span class="badge {% if latest_sync.status == 'OK' %}badge-completed{% else %}text-bg-danger{% endif %}">{{ latest_sync.status }}</span></dd>
+                    <dt class="col-sm-4">Έναρξη</dt>
+                    <dd class="col-sm-8">{{ latest_sync.started_at|datetime_el }}</dd>
+                    <dt class="col-sm-4">Γραμμές</dt>
+                    <dd class="col-sm-8">{{ latest_sync.rows_seen }}</dd>
+                    <dt class="col-sm-4">Μεταβολές</dt>
+                    <dd class="col-sm-8">{{ latest_sync.inserted }} νέες · {{ latest_sync.updated }} αλλαγές · {{ latest_sync.deleted }} διαγραφές</dd>
+                </dl>
+                {% if latest_sync.message %}
+                <div class="alert alert-warning mt-3 mb-0">{{ latest_sync.message }}</div>
+                {% endif %}
+                {% else %}
+                <div class="empty-state">Δεν έχει εκτελεστεί συγχρονισμός.</div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    <div class="col-xl-7">
+        <div class="card h-100">
+            <div class="card-header">Τελευταίες ενέργειες</div>
+            <div class="card-body p-0">
+                <div class="table-responsive">
+                    <table class="table table-hover mb-0 align-middle">
+                        <thead>
+                            <tr>
+                                <th>Ώρα</th>
+                                <th>Χρήστης</th>
+                                <th>Ενέργεια</th>
+                                <th>Στόχος</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for row in recent_audit %}
+                            <tr>
+                                <td class="text-nowrap">{{ row.created_at|datetime_el }}</td>
+                                <td>
+                                    <div class="fw-semibold">{{ row.actor }}</div>
+                                    <div class="compact-text">{{ role_label(row.role) }}</div>
+                                </td>
+                                <td>{{ row.action }}</td>
+                                <td>{{ row.target_id or '-' }}</td>
+                            </tr>
+                            {% else %}
+                            <tr><td colspan="4" class="empty-state">Δεν υπάρχουν ενέργειες.</td></tr>
+                            {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
