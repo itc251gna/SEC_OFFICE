@@ -64,7 +64,7 @@ Production deployment status as of 2026-06-11:
 ```text
 Host: linuxsrv01 / 10.4.51.232
 Folder: /home/kmh251/deployment/sec_office
-Gateway: /home/kmh251/deployment/app_gateway/nginx.conf.sso-phase1o-sec-office
+Gateway: /home/kmh251/deployment/app_gateway/nginx.conf.sso-phase1p-mmfi
 Git commit: 57ebc78c5bd0e9874733072a36f75782191eb768
 ```
 
