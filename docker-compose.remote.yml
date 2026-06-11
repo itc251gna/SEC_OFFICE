@@ -26,7 +26,7 @@ services:
       BACKUP_FOLDER: /app/runtime/backups
       SESSION_COOKIE_SECURE: "1"
       TRUST_SSO_HEADERS: "1"
-      SSO_TRUSTED_PROXY_CIDRS: 127.0.0.1/32,172.16.0.0/12
+      SSO_TRUSTED_PROXY_CIDRS: 127.0.0.1/32,172.16.0.0/12,192.168.0.0/16
       ORACLE_CONFIG_DIR: /app/runtime/oracle/network/admin
       TNS_ADMIN: /app/runtime/oracle/network/admin
       ORACLE_CLIENT_LIB_DIR: /opt/oracle/instantclient

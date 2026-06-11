@@ -9,6 +9,10 @@ import tempfile
 import time
 import uuid
 from datetime import date, datetime, timedelta
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote, urlencode
+from urllib.request import Request as UrlRequest
+from urllib.request import urlopen
 
 import pyzipper
 import qrcode
@@ -262,11 +266,14 @@ CENTRAL_AUTH_GROUPS_URL = os.getenv(
     "CENTRAL_AUTH_GROUPS_URL",
     f"https://auth.251gh.local/admin/master/console/#/{CENTRAL_AUTH_REALM}/groups",
 )
+ALLOW_LOCAL_USER_ADMIN_FROM_SSO = bool_env("ALLOW_LOCAL_USER_ADMIN_FROM_SSO", "0")
 
 MEDICO_SAMPLE_MODE = bool_env("MEDICO_SAMPLE_MODE", "0")
 MEDICO_SYNC_INTERVAL_MINUTES = int(os.getenv("MEDICO_SYNC_INTERVAL_MINUTES", "15"))
 MEDICO_DELETE_MISSING = bool_env("MEDICO_DELETE_MISSING", "1")
 MEDICO_SKIP_DELETE_ON_EMPTY = bool_env("MEDICO_SKIP_DELETE_ON_EMPTY", "1")
+MEDICO_BRIDGE_URL = os.getenv("MEDICO_BRIDGE_URL", "").strip()
+MEDICO_BRIDGE_TIMEOUT_SECONDS = int(os.getenv("MEDICO_BRIDGE_TIMEOUT_SECONDS", "30"))
 ORACLE_CLIENT_LIB_DIR = os.getenv("ORACLE_CLIENT_LIB_DIR", "").strip()
 ORACLE_CONFIG_DIR = os.getenv("ORACLE_CONFIG_DIR", "").strip()
 BACKUP_RETENTION_COUNT = int(os.getenv("BACKUP_RETENTION_COUNT", "30"))
@@ -487,8 +494,22 @@ def parse_sso_groups(raw):
     return groups
 
 
+def normalize_remote_address(value):
+    address = (value or "").strip()
+    if address.startswith("::ffff:"):
+        return address[7:]
+    return address
+
+
+def request_peer_address():
+    proxy_fix_original = request.environ.get("werkzeug.proxy_fix.orig") or {}
+    return normalize_remote_address(proxy_fix_original.get("REMOTE_ADDR") or request.remote_addr or "")
+
+
 def is_trusted_sso_proxy():
-    remote = request.remote_addr or ""
+    remote = request_peer_address()
+    if remote == "::1":
+        return True
     try:
         remote_ip = ipaddress.ip_address(remote)
     except ValueError:
@@ -537,6 +558,17 @@ def get_sso_user_from_headers():
     )
 
 
+def redirect_to_sso():
+    return redirect(f"/oauth2/sign_in?rd={quote(request.url, safe='')}")
+
+
+@login_manager.unauthorized_handler
+def unauthorized():
+    if TRUST_SSO_HEADERS:
+        return redirect_to_sso()
+    return redirect(url_for("login", next=request.url))
+
+
 @app.before_request
 def sync_sso_session():
     if request.endpoint in {"static", "health", "robots"}:
@@ -567,6 +599,12 @@ def is_admin_user():
 
 def can_manage_users():
     return has_role("admin")
+
+
+def can_manage_local_users():
+    if TRUST_SSO_HEADERS and getattr(current_user, "auth_method", "") == "sso":
+        return ALLOW_LOCAL_USER_ADMIN_FROM_SSO
+    return True
 
 
 def can_manage_backups():
@@ -750,9 +788,37 @@ def init_oracle_client_once():
     _oracle_client_initialized = True
 
 
+def fetch_medico_rows_from_bridge(kind):
+    separator = "&" if "?" in MEDICO_BRIDGE_URL else "?"
+    url = f"{MEDICO_BRIDGE_URL}{separator}{urlencode({'kind': kind})}"
+    req = UrlRequest(url, headers={"Accept": "application/json", "User-Agent": "SEC_OFFICE/1.0"})
+    try:
+        with urlopen(req, timeout=MEDICO_BRIDGE_TIMEOUT_SECONDS) as response:
+            body = response.read()
+    except HTTPError as exc:
+        detail = exc.read(500).decode("utf-8", errors="replace")
+        raise RuntimeError(f"MEDICO bridge HTTP {exc.code}: {detail}") from exc
+    except URLError as exc:
+        raise RuntimeError(f"MEDICO bridge unavailable: {exc.reason}") from exc
+
+    try:
+        payload = json.loads(body.decode("utf-8-sig"))
+    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
+        raise RuntimeError("MEDICO bridge returned invalid JSON.") from exc
+
+    if payload.get("status") != "OK":
+        raise RuntimeError(payload.get("message") or "MEDICO bridge returned an error.")
+    rows = payload.get("rows", [])
+    if not isinstance(rows, list):
+        raise RuntimeError("MEDICO bridge returned an invalid rows payload.")
+    return [normalize_external_row(row) for row in rows if isinstance(row, dict)]
+
+
 def fetch_medico_rows(query, kind):
     if MEDICO_SAMPLE_MODE:
         return [normalize_external_row(row) for row in sample_rows(kind)]
+    if MEDICO_BRIDGE_URL:
+        return fetch_medico_rows_from_bridge(kind)
     user = os.getenv("MEDICO_USER")
     password = os.getenv("MEDICO_PASSWORD")
     dsn = os.getenv("MEDICO_DSN", "MEDICOSRV")
@@ -969,6 +1035,8 @@ def health():
 def login():
     if current_user.is_authenticated:
         return redirect(url_for("index"))
+    if TRUST_SSO_HEADERS:
+        return redirect_to_sso()
     if request.method == "POST":
         username = request.form.get("username", "").strip()
         password = request.form.get("password", "")
@@ -1415,13 +1483,19 @@ def manage_users():
             (SSO_GLOBAL_ADMIN_GROUP, "Global admins"),
         ],
     }
-    return render_template("manage_users.html", users=users, central_auth=central_auth)
+    return render_template(
+        "manage_users.html",
+        users=users,
+        central_auth=central_auth,
+        allow_local_user_admin=can_manage_local_users(),
+    )
 
 
 @app.route("/users/create", methods=["POST"])
 @login_required
 def create_user():
     require_permission(can_manage_users)
+    require_permission(can_manage_local_users)
     username = request.form.get("username", "").strip()
     password = request.form.get("password", "")
     role = request.form.get("role", "security_point")
@@ -1446,6 +1520,7 @@ def create_user():
 @login_required
 def update_user(user_id):
     require_permission(can_manage_users)
+    require_permission(can_manage_local_users)
     user = User.query.get_or_404(user_id)
     role = request.form.get("role", user.role)
     if role in ROLES:
@@ -1467,6 +1542,7 @@ def update_user(user_id):
 @login_required
 def delete_user(user_id):
     require_permission(can_manage_users)
+    require_permission(can_manage_local_users)
     user = User.query.get_or_404(user_id)
     if user.username == os.getenv("ADMIN_USERNAME", "admin"):
         flash("Ο βασικός admin δεν διαγράφεται.", "warning")

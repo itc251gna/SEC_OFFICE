@@ -15,6 +15,7 @@
 <div class="row g-4 mb-4">
     <div class="col-xl-5">
         <div class="card h-100">
+            {% if allow_local_user_admin %}
             <div class="card-header">Νέος τοπικός χρήστης</div>
             <div class="card-body">
                 <form method="post" action="{{ url_for('create_user') }}">
@@ -42,6 +43,13 @@
                     </div>
                 </form>
             </div>
+            {% else %}
+            <div class="card-header">Keycloak users</div>
+            <div class="card-body">
+                <p class="mb-3">Οι χρήστες και τα δικαιώματα της εφαρμογής διαχειρίζονται κεντρικά στο Keycloak. Τα τοπικά accounts είναι emergency fallback και εδώ εμφανίζονται μόνο για έλεγχο.</p>
+                <a class="btn btn-primary" href="{{ central_auth.users_url }}" target="_blank" rel="noopener">Άνοιγμα Keycloak users</a>
+            </div>
+            {% endif %}
         </div>
     </div>
     <div class="col-xl-7">
@@ -65,6 +73,7 @@
     </div>
 </div>
 
+{% if allow_local_user_admin %}
 <div class="card">
     <div class="card-header">Τοπικοί fallback χρήστες</div>
     <div class="card-body p-0">
@@ -118,4 +127,12 @@
         </div>
     </div>
 </div>
+{% else %}
+<div class="card">
+    <div class="card-header">Keycloak source of truth</div>
+    <div class="card-body">
+        <p class="mb-0">Η παραγωγική διαχείριση χρηστών και δικαιωμάτων γίνεται στο Keycloak. Τα τοπικά fallback accounts δεν αλλάζουν από SSO sessions.</p>
+    </div>
+</div>
+{% endif %}
 {% endblock %}
