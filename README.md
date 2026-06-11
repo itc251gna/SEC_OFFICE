@@ -53,6 +53,23 @@ The expected production URL is:
 https://sec-office.251gh.local/
 ```
 
+Production deployment status as of 2026-06-11:
+
+```text
+Host: linuxsrv01 / 10.4.51.232
+Folder: /home/kmh251/deployment/sec_office
+Gateway: /home/kmh251/deployment/app_gateway/nginx.conf.sso-phase1o-sec-office
+Git commit: 57ebc78c5bd0e9874733072a36f75782191eb768
+```
+
+The app, PostgreSQL container, Keycloak groups and gateway route are deployed. Normal browser/mobile use still requires DNS:
+
+```text
+sec-office.251gh.local -> 10.4.51.232
+```
+
+Live MEDICO sync also requires the Linux x86-64 Oracle Instant Client 11.2 Basic package in `runtime/oracle/instantclient/`.
+
 Copy `.env.example` to `.env`, set strong secrets, set `MEDICO_SAMPLE_MODE=0`, provide MEDICO Oracle credentials through environment variables, and set `POSTGRES_PASSWORD` for `docker-compose.remote.yml`.
 
 The MEDICO database currently requires python-oracledb thick mode because it is Oracle 10g. Place the Linux x86-64 Oracle Instant Client 11.2 Basic package contents under:
