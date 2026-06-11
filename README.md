@@ -53,6 +53,12 @@ The expected production URL is:
 https://sec-office.251gh.local/
 ```
 
+Until the DNS record for the canonical hostname is available, the production gateway also exposes a secondary Wi-Fi/mobile test route through an existing intranet hostname:
+
+```text
+https://linuxsrv01-monitor.251gh.local/sec-office/
+```
+
 Production deployment status as of 2026-06-11:
 
 ```text
@@ -62,7 +68,7 @@ Gateway: /home/kmh251/deployment/app_gateway/nginx.conf.sso-phase1o-sec-office
 Git commit: 57ebc78c5bd0e9874733072a36f75782191eb768
 ```
 
-The app, PostgreSQL container, Keycloak groups and gateway route are deployed. Normal browser/mobile use still requires DNS:
+The app, PostgreSQL container, Keycloak groups and gateway routes are deployed. Canonical hostname use still requires DNS:
 
 ```text
 sec-office.251gh.local -> 10.4.51.232
