@@ -6,7 +6,7 @@ ENV PYTHONUNBUFFERED=1
 WORKDIR /app
 
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends postgresql-client libaio1 libnsl2 unzip \
+    && apt-get install -y --no-install-recommends postgresql-client default-jre-headless libaio1 libnsl2 unzip \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .

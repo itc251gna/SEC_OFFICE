@@ -62,7 +62,7 @@ Gateway: /home/kmh251/deployment/app_gateway/nginx.conf.sso-phase1p-mmfi
 Git commit: see GitHub main
 ```
 
-The app, PostgreSQL container, Keycloak groups, gateway route, SSO-first app login, Keycloak-first user management, and live MEDICO bridge are deployed. Hostname use requires DNS:
+The app, PostgreSQL container, Keycloak groups, gateway route, SSO-first app login, Keycloak-first user management, and live direct MEDICO Oracle access are deployed. Hostname use requires DNS:
 
 ```text
 sec-office.251gh.local -> 10.4.51.232
@@ -70,13 +70,28 @@ sec-office.251gh.local -> 10.4.51.232
 
 Copy `.env.example` to `.env`, set strong secrets, set `MEDICO_SAMPLE_MODE=0`, and set `POSTGRES_PASSWORD` for `docker-compose.remote.yml`.
 
-Production MEDICO access uses the legacy IIS bridge endpoint in `legacy_bridge/SecOfficeMedicoBridge.ashx`, deployed under the existing DailyReports application. Set:
+Production MEDICO access is direct from the SEC_OFFICE container to Oracle/MEDICO through JDBC thin mode. Set:
 
 ```text
-MEDICO_BRIDGE_URL=http://10.4.55.149/portal_services/SecOfficeMedicoBridge.ashx
+MEDICO_ORACLE_DRIVER=jdbc
+MEDICO_DSN=MEDICOSRV
+ORACLE_JDBC_JAR=/app/runtime/oracle/jdbc/ojdbc6.jar
+ORACLE_CONFIG_DIR=/app/runtime/oracle/network/admin
 ```
 
-The bridge executes the same legacy MEDICO queries through the existing `ConnectionString2` provider and is restricted to requests from `linuxsrv01` (`10.4.51.232`). Direct Linux Oracle thick mode remains available for future use if a compatible Oracle client is installed; leave `MEDICO_BRIDGE_URL` empty to use `MEDICO_DSN`, `MEDICO_USER`, and `MEDICO_PASSWORD`.
+Place the Oracle JDBC driver under:
+
+```text
+runtime/oracle/jdbc/ojdbc6.jar
+```
+
+Place `tnsnames.ora` under:
+
+```text
+runtime/oracle/network/admin/tnsnames.ora
+```
+
+Native python-oracledb thick mode remains available only as an explicit fallback with `MEDICO_ORACLE_DRIVER=oracledb` if a compatible Linux Oracle client is installed.
 
 SSO groups are configurable with the `SSO_*` variables and match the common gateway header flow. The default groups are:
 

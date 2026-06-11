@@ -6,13 +6,11 @@ import os
 import shutil
 import subprocess
 import tempfile
+import threading
 import time
 import uuid
 from datetime import date, datetime, timedelta
-from urllib.error import HTTPError, URLError
-from urllib.parse import quote, urlencode
-from urllib.request import Request as UrlRequest
-from urllib.request import urlopen
+from urllib.parse import quote
 
 import pyzipper
 import qrcode
@@ -214,7 +212,7 @@ WHERE (X1000PER.PER = X1100PAT.PER)
   AND (X1150COG.PAT = X1100PAT.PAT)
   AND (X8001DEB.DEB = X1150COG.DEB)
   AND (X1100PAT.PAT = KEN_KDATA.EPISODE(+))
-  AND (X1100PAT.DISD = '31-12-2099')
+  AND (X1100PAT.DISD = DATE '2099-12-31')
   AND (X1100PAT.TYP = 'S')
   AND (X1100PAT.DISDCALC IS NOT NULL)
   AND (X1280DIA.DIT = 'ΕΞΙ')
@@ -272,14 +270,17 @@ MEDICO_SAMPLE_MODE = bool_env("MEDICO_SAMPLE_MODE", "0")
 MEDICO_SYNC_INTERVAL_MINUTES = int(os.getenv("MEDICO_SYNC_INTERVAL_MINUTES", "15"))
 MEDICO_DELETE_MISSING = bool_env("MEDICO_DELETE_MISSING", "1")
 MEDICO_SKIP_DELETE_ON_EMPTY = bool_env("MEDICO_SKIP_DELETE_ON_EMPTY", "1")
-MEDICO_BRIDGE_URL = os.getenv("MEDICO_BRIDGE_URL", "").strip()
-MEDICO_BRIDGE_TIMEOUT_SECONDS = int(os.getenv("MEDICO_BRIDGE_TIMEOUT_SECONDS", "30"))
+MEDICO_ORACLE_DRIVER = os.getenv("MEDICO_ORACLE_DRIVER", "jdbc").strip().lower()
+MEDICO_JDBC_URL = os.getenv("MEDICO_JDBC_URL", "").strip()
+ORACLE_JDBC_JAR = os.getenv("ORACLE_JDBC_JAR", os.path.join(RUNTIME_DIR, "oracle", "jdbc", "ojdbc6.jar")).strip()
+ORACLE_JDBC_DRIVER = os.getenv("ORACLE_JDBC_DRIVER", "oracle.jdbc.OracleDriver").strip()
 ORACLE_CLIENT_LIB_DIR = os.getenv("ORACLE_CLIENT_LIB_DIR", "").strip()
 ORACLE_CONFIG_DIR = os.getenv("ORACLE_CONFIG_DIR", "").strip()
 BACKUP_RETENTION_COUNT = int(os.getenv("BACKUP_RETENTION_COUNT", "30"))
 BACKUP_INCLUDE_DATABASE = bool_env("BACKUP_INCLUDE_DATABASE", "1")
 
 _oracle_client_initialized = False
+_jdbc_lock = threading.Lock()
 
 
 class User(UserMixin, db.Model):
@@ -788,37 +789,65 @@ def init_oracle_client_once():
     _oracle_client_initialized = True
 
 
-def fetch_medico_rows_from_bridge(kind):
-    separator = "&" if "?" in MEDICO_BRIDGE_URL else "?"
-    url = f"{MEDICO_BRIDGE_URL}{separator}{urlencode({'kind': kind})}"
-    req = UrlRequest(url, headers={"Accept": "application/json", "User-Agent": "SEC_OFFICE/1.0"})
+def jdbc_url_from_dsn(dsn):
+    if MEDICO_JDBC_URL:
+        return MEDICO_JDBC_URL
+    if dsn.lower().startswith("jdbc:"):
+        return dsn
+    return f"jdbc:oracle:thin:@{dsn}"
+
+
+def ensure_jdbc_jvm():
+    import jpype
+
+    if jpype.isJVMStarted():
+        return
+    with _jdbc_lock:
+        if jpype.isJVMStarted():
+            return
+        if not ORACLE_JDBC_JAR or not os.path.exists(ORACLE_JDBC_JAR):
+            raise RuntimeError(f"ORACLE_JDBC_JAR δεν βρέθηκε: {ORACLE_JDBC_JAR}")
+        jvm_args = ["-Duser.timezone=GMT", "-Doracle.jdbc.timezoneAsRegion=false"]
+        if ORACLE_CONFIG_DIR:
+            jvm_args.append(f"-Doracle.net.tns_admin={ORACLE_CONFIG_DIR}")
+        jpype.startJVM(jpype.getDefaultJVMPath(), *jvm_args, classpath=[ORACLE_JDBC_JAR])
+
+
+def normalize_jdbc_value(value):
+    if value is None:
+        return None
+    if hasattr(value, "toString"):
+        return str(value)
+    return value
+
+
+def fetch_medico_rows_jdbc(query):
+    user = os.getenv("MEDICO_USER")
+    password = os.getenv("MEDICO_PASSWORD")
+    dsn = os.getenv("MEDICO_DSN", "MEDICOSRV")
+    if not user or not password:
+        raise RuntimeError("MEDICO_USER και MEDICO_PASSWORD δεν έχουν οριστεί.")
+    ensure_jdbc_jvm()
+    import jaydebeapi
+
+    connection = jaydebeapi.connect(ORACLE_JDBC_DRIVER, jdbc_url_from_dsn(dsn), [user, password], ORACLE_JDBC_JAR)
     try:
-        with urlopen(req, timeout=MEDICO_BRIDGE_TIMEOUT_SECONDS) as response:
-            body = response.read()
-    except HTTPError as exc:
-        detail = exc.read(500).decode("utf-8", errors="replace")
-        raise RuntimeError(f"MEDICO bridge HTTP {exc.code}: {detail}") from exc
-    except URLError as exc:
-        raise RuntimeError(f"MEDICO bridge unavailable: {exc.reason}") from exc
-
-    try:
-        payload = json.loads(body.decode("utf-8-sig"))
-    except (UnicodeDecodeError, json.JSONDecodeError) as exc:
-        raise RuntimeError("MEDICO bridge returned invalid JSON.") from exc
-
-    if payload.get("status") != "OK":
-        raise RuntimeError(payload.get("message") or "MEDICO bridge returned an error.")
-    rows = payload.get("rows", [])
-    if not isinstance(rows, list):
-        raise RuntimeError("MEDICO bridge returned an invalid rows payload.")
-    return [normalize_external_row(row) for row in rows if isinstance(row, dict)]
+        cursor = connection.cursor()
+        try:
+            cursor.execute(query)
+            columns = [col[0] for col in cursor.description]
+            rows = []
+            for db_row in cursor.fetchall():
+                values = [normalize_jdbc_value(value) for value in db_row]
+                rows.append(normalize_external_row(dict(zip(columns, values))))
+            return rows
+        finally:
+            cursor.close()
+    finally:
+        connection.close()
 
 
-def fetch_medico_rows(query, kind):
-    if MEDICO_SAMPLE_MODE:
-        return [normalize_external_row(row) for row in sample_rows(kind)]
-    if MEDICO_BRIDGE_URL:
-        return fetch_medico_rows_from_bridge(kind)
+def fetch_medico_rows_oracledb(query):
     user = os.getenv("MEDICO_USER")
     password = os.getenv("MEDICO_PASSWORD")
     dsn = os.getenv("MEDICO_DSN", "MEDICOSRV")
@@ -840,6 +869,16 @@ def fetch_medico_rows(query, kind):
             for db_row in cursor.fetchall():
                 rows.append(normalize_external_row(dict(zip(columns, db_row))))
             return rows
+
+
+def fetch_medico_rows(query, kind):
+    if MEDICO_SAMPLE_MODE:
+        return [normalize_external_row(row) for row in sample_rows(kind)]
+    if MEDICO_ORACLE_DRIVER == "jdbc":
+        return fetch_medico_rows_jdbc(query)
+    if MEDICO_ORACLE_DRIVER in {"oracledb", "thick"}:
+        return fetch_medico_rows_oracledb(query)
+    raise RuntimeError(f"Unsupported MEDICO_ORACLE_DRIVER: {MEDICO_ORACLE_DRIVER}")
 
 
 def patient_hash_from_row(row):
